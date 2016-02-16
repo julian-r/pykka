@@ -3,14 +3,12 @@ import sys
 
 from pykka.exceptions import ActorDeadError
 
-
 __all__ = [
     'ActorProxy',
 ]
 
 
 class ActorProxy(object):
-
     """
     An :class:`ActorProxy` wraps an :class:`ActorRef <pykka.ActorRef>`
     instance. The proxy allows the referenced actor to be used through regular
@@ -115,11 +113,15 @@ class ActorProxy(object):
                 result[tuple(attr_path)] = {
                     'callable': self._is_callable_attribute(attr),
                     'traversable': self._is_traversable_attribute(attr),
+                    'priority': self._get_priority(attr)
                 }
                 if self._is_traversable_attribute(attr):
                     for attr_name in dir(attr):
                         attr_paths_to_visit.append(attr_path + [attr_name])
         return result
+
+    def _get_priority(self, attr):
+        return getattr(attr, '_pykka_priority', None)
 
     def _is_exposable_attribute(self, attr_name):
         """
@@ -168,7 +170,7 @@ class ActorProxy(object):
         if attr_info['callable']:
             if attr_path not in self._callable_proxies:
                 self._callable_proxies[attr_path] = _CallableProxy(
-                    self.actor_ref, attr_path)
+                    self.actor_ref, attr_path, attr_info['priority'])
             return self._callable_proxies[attr_path]
         elif attr_info['traversable']:
             if attr_path not in self._actor_proxies:
@@ -200,18 +202,28 @@ class ActorProxy(object):
 
 
 class _CallableProxy(object):
-
     """Internal helper class for proxying callables."""
 
-    def __init__(self, ref, attr_path):
+    def __init__(self, ref, attr_path, priority=None):
         self.actor_ref = ref
         self._attr_path = attr_path
+        self._priority = priority
 
     def __call__(self, *args, **kwargs):
         message = {
             'command': 'pykka_call',
             'attr_path': self._attr_path,
             'args': args,
-            'kwargs': kwargs,
+            'kwargs': kwargs
         }
+        if self._priority:
+            message['pykka_priority'] = self._priority
         return self.actor_ref.ask(message, block=False)
+
+
+def priority(priority_number):
+    def new_func(fun):
+        fun._pykka_priority = priority_number
+        return fun
+
+    return new_func

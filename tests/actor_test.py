@@ -3,6 +3,7 @@ import unittest
 import uuid
 
 from pykka import ActorDeadError, ActorRegistry, ThreadingActor
+from pykka.threading import ThreadingActorPriorityMailbox
 
 
 class AnActor(object):
@@ -348,6 +349,9 @@ class ThreadingActorTest(ConcreteActorTest(ThreadingActor, threading.Event)):
         self.assertTrue(actor_threads[0].daemon)
         actor_ref.stop()
 
+
+class ThreadingActorPriorityMailboxTest(ConcreteActorTest(ThreadingActorPriorityMailbox, threading.Event)):
+    pass
 
 try:
     import gevent.event

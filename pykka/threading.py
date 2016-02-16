@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import logging
 import sys
 import threading
 
@@ -8,15 +9,16 @@ from pykka.actor import Actor
 from pykka.exceptions import Timeout
 from pykka.future import Future
 
-
 __all__ = [
     'ThreadingActor',
     'ThreadingFuture',
+    'ThreadingActorPriorityMailbox'
 ]
+
+logger = logging.getLogger('pykka')
 
 
 class ThreadingFuture(Future):
-
     """
     :class:`ThreadingFuture` implements :class:`Future` for use with
     :class:`ThreadingActor <pykka.ThreadingActor>`.
@@ -65,7 +67,6 @@ class ThreadingFuture(Future):
 
 
 class ThreadingActor(Actor):
-
     """
     :class:`ThreadingActor` implements :class:`Actor` using regular Python
     threads.
@@ -104,3 +105,32 @@ class ThreadingActor(Actor):
         thread.name = thread.name.replace('Thread', self.__class__.__name__)
         thread.daemon = self.use_daemon_thread
         thread.start()
+
+
+class PriorityQueueMailbox(compat.queue.PriorityQueue):
+    """
+    This behaves like a normal queue, but adds
+
+    """
+
+    def __init__(self, default_priority=100, priority_key='pykka_priority', *args, **kwargs):
+        compat.queue.PriorityQueue.__init__(self, *args, **kwargs)
+        self.priority_key = priority_key
+        self.item_counter = 0
+        self.item_counter_lock = threading.Lock()
+        self.default_priority = default_priority
+
+    def _get(self):
+        return compat.queue.PriorityQueue._get(self)[2]
+
+    def _put(self, item):
+        with self.item_counter_lock:
+            self.item_counter += 1
+            item = (item.get(self.priority_key, self.default_priority), self.item_counter, item)
+        compat.queue.PriorityQueue._put(self, item)
+
+
+class ThreadingActorPriorityMailbox(ThreadingActor):
+    @staticmethod
+    def _create_actor_inbox():
+        return PriorityQueueMailbox()

@@ -2,6 +2,7 @@ import time
 import unittest
 
 from pykka import ActorDeadError, ThreadingActor, ThreadingFuture, Timeout
+from pykka.threading import ThreadingActorPriorityMailbox
 
 
 class AnActor(object):
@@ -124,6 +125,10 @@ def ConcreteRefTest(actor_class, future_class, sleep_function):
 
 ThreadingActorRefTest = ConcreteRefTest(
     ThreadingActor, ThreadingFuture, time.sleep)
+
+
+ThreadingActorRefPrioTest = ConcreteRefTest(
+    ThreadingActorPriorityMailbox, ThreadingFuture, time.sleep)
 
 try:
     import gevent
